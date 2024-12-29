@@ -9,12 +9,10 @@
     <h1>Set EXIF Date from Filename</h1>
     <input type="file" id="fileInput" accept="image/*">
 
-    <script src="https://cdn.jsdelivr.net/npm/modify-exif"></script>
+    <script src="https://cdn.jsdelivr.net/npm/piexifjs/piexif.js"></script>
     <script>
-        const fileInput = document.getElementById('fileInput');
-
-        fileInput.addEventListener('change', async (event) => {
-            const file = event.target.files[0];
+        function handleFileSelect(evt) {
+            const file = evt.target.files[0];
             if (!file) return;
 
             // Extract date and time from filename
@@ -30,26 +28,32 @@
             const [hour, minute, second] = timePart.split('.');
             const formattedDate = `${year}:${month}:${day} ${hour}:${minute}:${second}`;
 
-            // Read the file as an ArrayBuffer
-            const arrayBuffer = await file.arrayBuffer();
+            // Prepare EXIF data
+            const zeroth = {};
+            const exif = {};
 
-            // Modify EXIF data
-            const updatedBuffer = await modifyExif(arrayBuffer, {
-                "Exif": {
-                    "DateTimeOriginal": formattedDate,
-                    "DateTimeDigitized": formattedDate
-                }
-            });
+            exif[piexif.ExifIFD.DateTimeOriginal] = formattedDate;
+            exif[piexif.ExifIFD.DateTimeDigitized] = formattedDate;
 
-            // Create a new Blob and trigger download
-            const blob = new Blob([updatedBuffer], { type: file.type });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = file.name;
-            link.click();
+            const exifObj = { "0th": zeroth, "Exif": exif };
+            const exifStr = piexif.dump(exifObj);
 
-            alert('EXIF data updated and file downloaded.');
-        });
+            const reader = new FileReader();
+
+            reader.onload = function (e) {
+                const inserted = piexif.insert(exifStr, e.target.result);
+
+                const blob = new Blob([new Uint8Array(inserted)], { type: file.type });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = file.name;
+                link.click();
+            };
+
+            reader.readAsDataURL(file);
+        }
+
+        document.getElementById('fileInput').addEventListener('change', handleFileSelect, false);
     </script>
 </body>
 </html>
