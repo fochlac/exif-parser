@@ -7,50 +7,62 @@
 </head>
 <body>
     <h1>Set EXIF Date from Filename</h1>
-    <input type="file" id="fileInput" accept="image/*">
+    <input type="file" id="fileInput" accept="image/*" multiple>
+    <div id="output"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/piexifjs/piexif.js"></script>
     <script>
         function handleFileSelect(evt) {
-            const file = evt.target.files[0];
-            if (!file) return;
+            const files = evt.target.files;
+            if (!files.length) return;
 
-            // Extract date and time from filename
-            const filename = file.name;
-            const dateTimeMatch = filename.match(/\d{4}-\d{2}-\d{2} um \d{2}\.\d{2}\.\d{2}/); // e.g., YYYY-MM-DD um HH.MM.SS
-            if (!dateTimeMatch) {
-                alert('Filename does not contain a valid date and time in the expected format.');
-                return;
-            }
+            const outputDiv = document.getElementById('output');
+            outputDiv.innerHTML = ""; // Clear previous content
 
-            const [datePart, timePart] = dateTimeMatch[0].split(' um ');
-            const [year, month, day] = datePart.split('-');
-            const [hour, minute, second] = timePart.split('.');
-            const formattedDate = `${year}:${month}:${day} ${hour}:${minute}:${second}`;
+            Array.from(files).forEach(file => {
+                // Extract date and time from filename
+                const filename = file.name;
+                const dateTimeMatch = filename.match(/\d{4}-\d{2}-\d{2} um \d{2}\.\d{2}\.\d{2}/); // e.g., YYYY-MM-DD um HH.MM.SS
+                if (!dateTimeMatch) {
+                    const errorMsg = document.createElement('p');
+                    errorMsg.textContent = `File "${filename}" does not contain a valid date and time in the expected format.`;
+                    errorMsg.style.color = "red";
+                    outputDiv.appendChild(errorMsg);
+                    return;
+                }
 
-            // Prepare EXIF data
-            const zeroth = {};
-            const exif = {};
+                const [datePart, timePart] = dateTimeMatch[0].split(' um ');
+                const [year, month, day] = datePart.split('-');
+                const [hour, minute, second] = timePart.split('.');
+                const formattedDate = `${year}:${month}:${day} ${hour}:${minute}:${second}`;
 
-            exif[piexif.ExifIFD.DateTimeOriginal] = formattedDate;
-            exif[piexif.ExifIFD.DateTimeDigitized] = formattedDate;
+                // Prepare EXIF data
+                const zeroth = {};
+                const exif = {};
 
-            const exifObj = { "0th": zeroth, "Exif": exif };
-            const exifStr = piexif.dump(exifObj);
+                exif[piexif.ExifIFD.DateTimeOriginal] = formattedDate;
+                exif[piexif.ExifIFD.DateTimeDigitized] = formattedDate;
 
-            const reader = new FileReader();
+                const exifObj = { "0th": zeroth, "Exif": exif };
+                const exifStr = piexif.dump(exifObj);
 
-            reader.onload = function (e) {
-                const inserted = piexif.insert(exifStr, e.target.result);
+                const reader = new FileReader();
 
-                const blob = new Blob([new Uint8Array(inserted)], { type: file.type });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = file.name;
-                link.click();
-            };
+                reader.onload = function (e) {
+                    const inserted = piexif.insert(exifStr, e.target.result);
 
-            reader.readAsDataURL(file);
+                    // Create an image element with the updated data
+                    const img = document.createElement('img');
+                    img.src = inserted;
+                    img.alt = `Image: ${filename}`;
+                    img.style.maxWidth = "300px";
+                    img.style.margin = "10px";
+
+                    outputDiv.appendChild(img);
+                };
+
+                reader.readAsDataURL(file);
+            });
         }
 
         document.getElementById('fileInput').addEventListener('change', handleFileSelect, false);
