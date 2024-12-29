@@ -3,25 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Metadata Analyzer</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js" integrity="sha512-xsoiisGNT6Dw2Le1Cocn5305Uje1pOYeSzrpO3RD9K+JTpVH9KqSXksXqur8cobTEKJcFz0COYq4723mzo88/Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <title>EXIF Date Editor</title>
 </head>
 <body>
-    <h1>Image Metadata Analyzer</h1>
-    <input type="file" id="fileInput">
-    <pre id="metadata"></pre>
+    <h1>Set EXIF Date from Filename</h1>
+    <input type="file" id="fileInput" accept="image/*">
 
+    <script src="https://cdn.jsdelivr.net/npm/modify-exif"></script>
     <script>
-        document.getElementById('fileInput').addEventListener('change', function(event) {
+        const fileInput = document.getElementById('fileInput');
+
+        fileInput.addEventListener('change', async (event) => {
             const file = event.target.files[0];
-            if (file) {
-                EXIF.getData(file, function() {
-                    const allMetaData = EXIF.getAllTags(this);
-                    const metadata = JSON.stringify(allMetaData, null, 2);
-                    document.getElementById('metadata').textContent = metadata;
-                    document.getElementById('fileInput').value = ''
-                });
+            if (!file) return;
+
+            // Extract date and time from filename
+            const filename = file.name;
+            const dateTimeMatch = filename.match(/\d{4}-\d{2}-\d{2} um \d{2}\.\d{2}\.\d{2}/); // e.g., YYYY-MM-DD um HH.MM.SS
+            if (!dateTimeMatch) {
+                alert('Filename does not contain a valid date and time in the expected format.');
+                return;
             }
+
+            const [datePart, timePart] = dateTimeMatch[0].split(' um ');
+            const [year, month, day] = datePart.split('-');
+            const [hour, minute, second] = timePart.split('.');
+            const formattedDate = `${year}:${month}:${day} ${hour}:${minute}:${second}`;
+
+            // Read the file as an ArrayBuffer
+            const arrayBuffer = await file.arrayBuffer();
+
+            // Modify EXIF data
+            const updatedBuffer = await modifyExif(arrayBuffer, {
+                "Exif": {
+                    "DateTimeOriginal": formattedDate,
+                    "DateTimeDigitized": formattedDate
+                }
+            });
+
+            // Create a new Blob and trigger download
+            const blob = new Blob([updatedBuffer], { type: file.type });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = file.name;
+            link.click();
+
+            alert('EXIF data updated and file downloaded.');
         });
     </script>
 </body>
